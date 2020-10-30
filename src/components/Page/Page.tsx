@@ -43,6 +43,7 @@ import ModerationHub from '../Pages/ModerationHub/ModerationHub';
 import ModerationChat from '../Pages/ChatView/ModerationChat';
 import AllAttendees from '../Pages/AllAttendees/AllAttendees';
 import useUserRoles from '../../hooks/useUserRoles';
+import Connections from '../Pages/ChatRoulette/Connections';
 
 interface Props {
     doLogin: doLoginF;
@@ -197,6 +198,10 @@ function Page(props: Props) {
                     <Route path="/admin" component={() =>
                         <AdminTools />
                     } />
+
+                    <Route path="/connections" component={() =>
+                        <Connections />
+                    } />        
 
                     {footerRoutes}
 
