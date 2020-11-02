@@ -79,9 +79,10 @@ up.
    Parse-based backend and React frontend
 1. Clone [clowdr-backend](https://github.com/clowdr-app/clowdr-backend) - our
    plain Node backend for Twilio callbacks
+1. Clone [clowdr-db-schema](https://github.com/clowdr-app/clowdr-db-schema) - our
+   database schema
 1. Within `clowdr-web-app`, run `npm install`
 1. Within `clowdr-web-app/backend/cloud`, run `npm install`
-1. Within `clowdr-backend`, run `npm install`
 1. Start the parse server. 
 
    Run this command from within `clowdr-web-app`:
@@ -130,23 +131,17 @@ up.
     1. Rename the copy to `.env`
     1. That's it, no further customisation is required for local development.
 1. Ensure `mongo`, `mongodump` and `mongorestore` are on your PATH.
-1. From within `clowdr-web-app`, run `npm run init-test-data`
+1. From within `clowdr-web-app`, run `npm run create-conference1` (Make sure Node.js is updated to v14).
 1. From within `clowdr-web-app`, run `npm start`. This may take a while.
 1. If all went well, you will (eventually - it can take minutes!) end up
    with a browser tab showing you a test instance of Clowdr.
+1. Then you can login using: 
+      Email: admin@sc1.com
+      Password: admin
 
 ## Configuring External Services
 
-For this step you will need to enter the CLOWDR interface using:
-
-    EMAIL:    clowdr@sys.admin 
-    PASSWORD: admin
-
-Navigate to Administration > Conference Configuration. You will need to add
-various API keys and tokens to this interface. (Make sure to hit SAVE after each
-token.)
-
-**NOTE** DO NOT hit "Initialize Conference" now. The backend is required first.
+For this step you will need to change the confieguration in the `.env`:
 
 ### Twilio
 
@@ -158,12 +153,8 @@ Clowdr uses Twilio as the text and video chat service.
 
 | Config Value              | Description                                                                             |
 |---------------------------|-----------------------------------------------------------------------------------------|
-| `TWILIO_ACCOUNT_SID`      | Visible on the account dashboard.                                                       |
-| `TWILIO_API_KEY`          | The SID of the new API key you created.                                                 |
-| `TWILIO_API_SECRET`       | The secret for the API key you created.                                                 |
+| `TWILIO_MASTER_SID`       | Visible on the account dashboard.                                                       |
 | `TWILIO_AUTH_TOKEN`       | Visible on the account dashboard.                                                       |
-| `TWILIO_CHAT_SERVICE_SID` | Under "..." on the left, go to "Programmable Chat". Create a chat service. Use its SID. |
-| `REACT_APP_FRONTEND_URL`  | For development, this is just `http://localhost:3000`.                                  |
 
 ### Sendgrid
 
@@ -182,7 +173,7 @@ Clowdr uses Sendgrid to deliver emails to conference participants.
 | `SENDGRID_API_KEY` | Your sendgrid API key.        |
 | `SENDGRID_SENDER`  | Your verified sender address. |
 
-### Zoon
+### Zoom
 
 To use zoom embedding, you need to create a JWT app on Zoom, and set the
 instance configuration variables `ZOOM_API_KEY` and `ZOOM_API_SECRET` with the
@@ -193,9 +184,7 @@ values from Zoom.
 1. Clone the (CLOWDR backend)[https://github.com/clowdr-app/clowdr-backend].
 1. Run `npm install` in the backend directory.
 1. Run `ln -s "../clowdr-web-app/.env" .env` to link the `.env` file.
-1. Run `npm start`.
-
-Now you can hit "Initialize Conference" in CLOWDR and begin using the app.
+1. Run `npm run ngrok` to start the backend.
 
 ## Further Setup
 
