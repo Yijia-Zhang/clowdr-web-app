@@ -137,6 +137,7 @@ export default class TwilioChatService implements IChatService {
         if (!this._REACT_APP_TWILIO_CALLBACK_URL) {
             assert(this.conference);
             const results = await ConferenceConfiguration.getByKey("REACT_APP_TWILIO_CALLBACK_URL", this.conference.id);
+            console.log(results);
             if (results.length > 0) {
                 this._REACT_APP_TWILIO_CALLBACK_URL = results[0].value;
             }
