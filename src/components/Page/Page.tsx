@@ -44,6 +44,9 @@ import ModerationChat from '../Pages/ChatView/ModerationChat';
 import AllAttendees from '../Pages/AllAttendees/AllAttendees';
 import useUserRoles from '../../hooks/useUserRoles';
 import Connections from '../Pages/ChatRoulette/Connections';
+import ChatRoom from '../Pages/ChatRoulette/ChatRoom';
+import NewChatRoom from '../Pages/ChatRoulette/NewChatRoom';
+import AllChatRooms from "../Pages/ChatRoulette/AllChatRooms";
 
 interface Props {
     doLogin: doLoginF;
@@ -201,7 +204,16 @@ function Page(props: Props) {
 
                     <Route path="/connections" component={() =>
                         <Connections />
-                    } />        
+                    } />
+
+                    {/*<Route path="/roulette" component={() =>*/}
+                    {/*    <ChatRoom />*/}
+                    {/*} />*/}
+
+                    <Route path="/roulette/:roomId" component={(p: RouteComponentProps<any>) =>
+                        <ChatRoom roomId={p.match.params.roomId} />
+                    } />
+                    <Route path="/roulette" component={NewChatRoom} />
 
                     {footerRoutes}
 
