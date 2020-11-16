@@ -13,7 +13,7 @@ import useUserProfile from "../../hooks/useUserProfile";
 interface Props {
     feed: ContentFeed;
 
-    autoJoinZoom?: boolean;
+    autoJoinZoom?: false | "zoom-app" | "zoom-browser";
 
     hideZoomRoom?: boolean;
     hideYouTube?: boolean;
@@ -117,6 +117,13 @@ export default function ViewContentFeed(props: Props) {
         className += " zoom";
     }
 
+    useEffect(() => {
+        if (zoomRoom && zoomRoom !== "not present" && props.autoJoinZoom === "zoom-app") {
+            setVideoIsPlaying(false);
+            window.open(zoomRoom.url, "blank");
+        }
+    }, [props.autoJoinZoom, zoomRoom]);
+
     const zoom = !props.hideZoomRoom && zoomRoom && zoomRoom !== "not present"
         ? (
             <>
@@ -134,7 +141,7 @@ export default function ViewContentFeed(props: Props) {
                         >
                             {props.zoomButtonText ? props.zoomButtonText.app : "Join by Zoom App (recommended)"}
                         </a><br />
-                        {zoomDetails && (props.autoJoinZoom || joinZoom) ? (
+                        {zoomDetails && (props.autoJoinZoom === "zoom-browser" || joinZoom) ? (
                             <div className="zoom-frame-container">
                                 <IframeResizer
                                     className="zoom-frame"

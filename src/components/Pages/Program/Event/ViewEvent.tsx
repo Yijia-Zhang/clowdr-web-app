@@ -38,7 +38,12 @@ enum EventViewElements {
     VideoRoomWithClosedownWarning
 }
 
-type EndOfEventActions = "zoom" | "next" | "always-next" | "no-action";
+type EndOfEventAction = {
+    action: EndOfEventActions;
+    eventId: string;
+};
+
+type EndOfEventActions = "zoom-app" | "zoom-browser" | "next" | "always-next" | "no-action";
 
 export default function ViewEvent(props: Props) {
     const conference = useConference();
@@ -48,7 +53,7 @@ export default function ViewEvent(props: Props) {
     const [session, setSession] = useState<ProgramSession | null>(null);
     const [eventsOfSession, setEventsOfSession] = useState<ProgramSessionEvent[]>();
     const [sessionFeed, setSessionFeed] = useState<ContentFeed | null>(null);
-    const [doJoinZoom, setDoJoinZoom] = useState<boolean>(false);
+    const [actionToDo, setActionToDo] = useState<false | EndOfEventAction>(false);
     const [isInZoom, setIsInZoom] = useState<boolean>(false);
 
     const [allSessions, setAllSessions] = useState<ProgramSession[]>();
@@ -445,7 +450,9 @@ export default function ViewEvent(props: Props) {
                                         ? (
                                             <div className="session-feed">
                                                 {<ViewContentFeed
-                                                    autoJoinZoom={doJoinZoom}
+                                                    autoJoinZoom={actionToDo &&
+                                                        (actionToDo.action === "zoom-app" || actionToDo.action === "zoom-browser") &&
+                                                        actionToDo.action}
                                                     setIsInZoom={setIsInZoom}
                                                     feed={sessionFeed}
                                                     hideVideoRoom={true}
@@ -482,7 +489,7 @@ export default function ViewEvent(props: Props) {
                 }
             </div>
         );
-    }, [buttons, doJoinZoom, elementsToShow, event, item, session, sessionFeed, viewMode]);
+    }, [actionToDo, buttons, elementsToShow, event, item, session, sessionFeed, viewMode]);
 
     // Popups:
     //      - 30 seconds before end of event
@@ -534,9 +541,7 @@ export default function ViewEvent(props: Props) {
                 const matchingFeeds = feeds.filter(x => x.youtubeId === sessionFeed.youtubeId || x.zoomRoomId === sessionFeed.zoomRoomId).map(x => x.id);
                 const nextSessions
                     = sessionsWSE
-                        .filter(x =>
-                            x.earliestStart.getTime() > now
-                        )
+                        .filter(x => x.earliestStart.getTime() > now)
                         .sort((x, y) => x.earliestStart.getTime() - y.earliestStart.getTime());
                 const matchingSessions
                     = nextSessions
@@ -590,25 +595,46 @@ export default function ViewEvent(props: Props) {
     const isAboutToEnd = !!nextEvent && endDist > 0 && endDist < (1000 * 60);
     const history = useHistory();
     useEffect(() => {
-        if (nextEvent && chosenAction && isAboutToEnd && !isInZoom) {
+        if (event && nextEvent && chosenAction && isAboutToEnd && !actionToDo) {
             setChosenAction(getDefaultAction());
 
-            if (chosenAction === "always-next" || chosenAction === "next") {
-                setDoJoinZoom(false);
+            if (chosenAction === "no-action") {
+                setActionToDo({
+                    eventId: event.id,
+                    action: "no-action"
+                });
+            }
+            else if (chosenAction === "always-next" || chosenAction === "next") {
+                setActionToDo(false);
                 history.push(`/event/${nextEvent.id}`);
             }
-            else if (chosenAction === "zoom") {
-                setDoJoinZoom(true);
+            else if (chosenAction === "zoom-app") {
+                setActionToDo({
+                    eventId: event.id,
+                    action: "zoom-app"
+                });
+            }
+            else if (chosenAction === "zoom-browser") {
+                setActionToDo({
+                    eventId: event.id,
+                    action: "zoom-browser"
+                });
             }
         }
-    }, [chosenAction, history, isAboutToEnd, isInZoom, nextEvent]);
+    }, [actionToDo, chosenAction, event, history, isAboutToEnd, isInZoom, nextEvent]);
+
+    useEffect(() => {
+        if (event && actionToDo && actionToDo.eventId !== event.id) {
+            setActionToDo(false);
+        }
+    }, [actionToDo, event]);
 
     return (
         <>
             {view}
 
             <Dialog
-                open={isAboutToEnd && !chosenAction && viewMode !== EventViewMode.Everything && !isInZoom}
+                open={isAboutToEnd && !chosenAction && viewMode !== EventViewMode.Everything && !actionToDo}
                 onClose={() => handleCloseNextEventDialog("no-action")}
                 aria-labelledby="next-session-dialog-title"
                 aria-describedby="next-session-dialog-description"
@@ -628,11 +654,20 @@ export default function ViewEvent(props: Props) {
                     </DialogContentText> */}
                 </DialogContent>
                 <DialogActions>
+                    <Button onClick={() => handleCloseNextEventDialog("zoom-app")} color="primary">
+                        Join this talk's Q&amp;A in Zoom in app
+                    </Button>
+                    <Button onClick={() => handleCloseNextEventDialog("zoom-browser")} color="primary">
+                        Join this talk's Q&amp;A in Zoom in browser
+                    </Button>
+                    <br />
+                    {/* <Button onClick={() => handleCloseNextEventDialog("always-next")} color="primary">
+                        Always watch next talk
+                    </Button> */}
+                </DialogActions>
+                <DialogActions>
                     <Button onClick={() => handleCloseNextEventDialog("no-action")} color="primary">
                         Stay here
-                    </Button>
-                    <Button onClick={() => handleCloseNextEventDialog("zoom")} color="primary">
-                        Join this talk's Q&amp;A in Zoom
                     </Button>
                     <Button onClick={() => handleCloseNextEventDialog("next")} color="primary" autoFocus>
                         Watch next talk
