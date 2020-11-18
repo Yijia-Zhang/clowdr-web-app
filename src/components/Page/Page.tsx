@@ -55,7 +55,6 @@ import ProgramEditor from "../Pages/Admin/Program/ProgramEditor";
 import ProfileItems from "../Pages/ProfileItems/ProfileItems";
 import AdminAnalytics from "../Pages/Admin/Analytics/Analytics";
 import Connections from "../Pages/ChatRoulette/Connections";
-import ChatRoom from '../Pages/ChatRoulette/ChatRoom';
 import NewChatRoom from '../Pages/ChatRoulette/NewChatRoom';
 
 interface Props {
@@ -263,7 +262,7 @@ function Page(props: Props) {
                     <Route path="/admin" component={isAdmin ? AdminTools : NotFound} />
 
                     <Route path="/roulette/:roomId" component={(p: RouteComponentProps<any>) =>
-                        <ChatRoom roomId={p.match.params.roomId} />
+                        <VideoRoom roomId={p.match.params.roomId} />
                     } />
                     <Route path="/roulette" component={NewChatRoom} />
 
