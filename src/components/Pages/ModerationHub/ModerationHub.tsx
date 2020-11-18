@@ -1,3 +1,4 @@
+import assert from "assert";
 import React, { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import SplitterLayout from "react-splitter-layout";
@@ -37,6 +38,7 @@ export default function ModerationHub() {
 
     const moderationNamePrefix = "Moderation: ";
     function channelName(channel: ChatDescriptor) {
+        assert(channel.isModeration);
         return `${channel.createdAt.toLocaleString(undefined, {
             hour12: false,
             month: "short",

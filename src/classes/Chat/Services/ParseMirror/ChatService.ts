@@ -1,4 +1,5 @@
 import { Conference, UserProfile } from "@clowdr-app/clowdr-db-schema";
+import { TextChat as TextChatSchema } from "@clowdr-app/clowdr-db-schema/build/DataLayer/Schema";
 import IChannel from "../../IChannel";
 import IChatManager from "../../IChatManager";
 import IChatService from "../../IChatService";
@@ -14,7 +15,7 @@ export default class ParseMirrorChatService implements IChatService {
     teardown(): Promise<void> {
         throw new Error("Method not implemented.");
     }
-    allChannels(): Promise<Array<Channel>> {
+    channels(filterF?: (current: TextChatSchema) => boolean): Promise<Array<Channel>> {
         throw new Error("Method not implemented.");
     }
     activeChannels(): Promise<Array<Channel>> {

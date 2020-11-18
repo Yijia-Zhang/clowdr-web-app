@@ -65,7 +65,7 @@ export default function useOnlineStatus(userProfiles: UserProfile[]): Map<string
                         const isOnline = (await update.user.isOnline) ?? false;
                         setOnlineStatus(status => {
                             const newStatus = new Map(status);
-                            if (update.user.isOnline !== undefined) {
+                            if (isOnline !== undefined) {
                                 newStatus.set(update.user.profileId, isOnline);
                             } else if (newStatus.has(update.user.profileId)) {
                                 newStatus.delete(update.user.profileId);

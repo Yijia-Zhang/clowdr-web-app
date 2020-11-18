@@ -61,25 +61,25 @@ export default class Channel implements IChannel {
     }> {
         throw new Error("Method not implemented.");
     }
-    getIsPrivate(): Promise<boolean> {
+    getIsPrivate(): boolean {
         throw new Error("Method not implemented.");
     }
-    getIsModeration(): Promise<boolean> {
+    getIsModeration(): boolean {
         throw new Error("Method not implemented");
     }
-    getIsModerationCompleted(): Promise<boolean> {
+    getIsModerationCompleted(): boolean {
         throw new Error("Method not implemented");
     }
-    getIsModerationHub(): Promise<boolean> {
+    getIsModerationHub(): boolean {
         throw new Error("Method not implemented");
     }
-    getRelatedModerationKey(): Promise<string | undefined> {
+    getRelatedModerationKey(): string | undefined {
         throw new Error("Method not implemented");
     }
-    getIsAutoWatchEnabled(): Promise<boolean> {
+    getIsAutoWatchEnabled(): boolean {
         throw new Error("Method not implemented.");
     }
-    getCreatedAt(): Promise<Date> {
+    getCreatedAt(): Date {
         throw new Error("Method not implemented.");
     }
     getCreator(): Promise<UserProfile> {

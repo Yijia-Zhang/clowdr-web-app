@@ -10,6 +10,7 @@ import * as Twilio from "twilio-chat";
 import { Channel as TwilioChannel } from "twilio-chat/lib/channel";
 import { User as TwilioUser } from "twilio-chat/lib/user";
 import { MemberDescriptor } from "../../Chat";
+import { TextChat as TextChatSchema } from "@clowdr-app/clowdr-db-schema/build/DataLayer/Schema";
 import { removeNull } from "@clowdr-app/clowdr-db-schema/build/Util";
 import { v4 as uuidv4 } from "uuid";
 
@@ -96,6 +97,7 @@ export default class TwilioChatService implements IChatService {
 
                     try {
                         // TODO: Increase log level if debugger enabled?
+                        this.logger.info("Creating Twilio client...");
                         const result = await Twilio.Client.create(this.twilioToken);
                         resolve(result);
                         resolved = true;
@@ -209,9 +211,9 @@ export default class TwilioChatService implements IChatService {
         return new Channel(tc, null, this);
     }
 
-    async allChannels(): Promise<Array<Channel>> {
+    async channels(filterF?: (current: TextChatSchema) => boolean): Promise<Array<Channel>> {
         if (this.conference) {
-            const allChats = await TextChat.getAll(this.conference.id);
+            const allChats = await (filterF ? TextChat.getChatsMatchingFilter(this.conference.id, filterF) : TextChat.getAll(this.conference.id));
             return removeNull(await Promise.all(allChats.map(async tc => {
                 try {
                     // Switching between users + caching may result in some channels
@@ -226,6 +228,7 @@ export default class TwilioChatService implements IChatService {
         }
         return [];
     }
+
     async activeChannels(): Promise<Array<Channel>> {
         if (this.profile) {
             const watched = await this.profile.watched;

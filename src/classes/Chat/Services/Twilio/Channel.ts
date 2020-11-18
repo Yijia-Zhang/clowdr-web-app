@@ -216,28 +216,28 @@ export default class Channel implements IChannel {
             return false;
         }
     }
-    async getIsPrivate(): Promise<boolean> {
+    getIsPrivate(): boolean {
         return !Object.keys(this.textChat.acl.permissionsById).some(x => x.startsWith("role:") && x.includes("attendee"));
     }
-    async getIsModeration(): Promise<boolean> {
+    getIsModeration(): boolean {
         return this.textChat.mode === "moderation" || this.textChat.mode === "moderation_completed";
     }
-    async getIsModerationCompleted(): Promise<boolean> {
+    getIsModerationCompleted(): boolean {
         return this.textChat.mode === "moderation_completed";
     }
-    async getIsModerationHub(): Promise<boolean> {
+    getIsModerationHub(): boolean {
         return this.textChat.mode === "moderation_hub";
     }
-    async getRelatedModerationKey(): Promise<string | undefined> {
+    getRelatedModerationKey(): string | undefined {
         return this.textChat.relatedModerationKey;
     }
-    async getCreatedAt(): Promise<Date> {
+    getCreatedAt(): Date {
         return this.textChat.createdAt;
     }
     getCreator(): Promise<UserProfile> {
         return this.textChat.creator;
     }
-    async getIsAutoWatchEnabled(): Promise<boolean> {
+    getIsAutoWatchEnabled(): boolean {
         return this.textChat.autoWatch;
     }
     async setIsAutoWatchEnabled(value: boolean): Promise<void> {

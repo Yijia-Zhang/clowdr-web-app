@@ -32,33 +32,32 @@ export type SidebarChatDescriptor = {
     friendlyName: string;
     isModeration: boolean;
     isModerationHub: boolean;
-    unreadCount: number;
+    unreadCount?: number;
 } & (
-    | {
-          isDM: false;
-      }
-    | {
-          isDM: true;
-          member1: MemberDescriptor<boolean | undefined> & { displayName: string };
-          member2: MemberDescriptor<boolean | undefined> & { displayName: string };
-      }
-);
+        | {
+            isDM: false;
+        }
+        | {
+            isDM: true;
+            otherMembers: (MemberDescriptor<boolean | undefined> & { displayName: string })[];
+        }
+    );
 
 type FilteredChatDescriptor =
     | (ChatDescriptor & { exists: true })
     | {
-          exists: false;
-          friendlyName: string;
-          targetPath: string;
-      };
+        exists: false;
+        friendlyName: string;
+        targetPath: string;
+    };
 
 type FilteredSidebarChatDescriptor =
     | SidebarChatDescriptor
     | {
-          exists: false;
-          friendlyName: string;
-          targetPath: string;
-      };
+        exists: false;
+        friendlyName: string;
+        targetPath: string;
+    };
 
 export type SidebarUserDescriptor = {
     id: string;
@@ -88,15 +87,15 @@ type ChatsGroupUpdate =
     | { action: "searchChats"; search: string | null }
     | { action: "setIsOpen"; isOpen: boolean }
     | {
-          action: "updateChatDescriptors";
-          fActive: (x: SidebarChatDescriptor) => SidebarChatDescriptor;
-          fFiltered: (x: FilteredSidebarChatDescriptor) => FilteredSidebarChatDescriptor;
-      }
+        action: "updateChatDescriptors";
+        fActive: (x: SidebarChatDescriptor) => SidebarChatDescriptor;
+        fFiltered: (x: FilteredSidebarChatDescriptor) => FilteredSidebarChatDescriptor;
+    }
     | { action: "setWatchedChatIds"; ids: Array<string> }
     | {
-          action: "updateAllUsers";
-          update: (old: Array<SidebarUserDescriptor> | null) => Array<SidebarUserDescriptor> | null;
-      };
+        action: "updateAllUsers";
+        update: (old: Array<SidebarUserDescriptor> | null) => Array<SidebarUserDescriptor> | null;
+    };
 
 async function filterChats(
     allChats: Array<ChatDescriptor>,
@@ -110,26 +109,26 @@ async function filterChats(
         const filteredUsers = allUsers.filter(
             x => x.name.toLowerCase().includes(search) && x.id !== currentUserProfileId && !x.isBanned
         );
-        const filteredChats: FilteredChatDescriptor[] = allChats
+        const filteredChats = allChats
             .filter(
                 x =>
                     x.friendlyName.toLowerCase().includes(search) ||
                     (x.isDM &&
-                        filteredUsers.some(p => {
-                            return (
-                                x.member1.profileId === currentUserProfileId ||
-                                x.member2.profileId === currentUserProfileId
-                            );
-                        }))
-            )
-            .map(x => ({ ...x, exists: true }));
-        return filteredChats.concat(
+                        (
+                            (x.member1.profileId === currentUserProfileId && filteredUsers.some(y => y.id === x.member2.profileId)) ||
+                            (x.member2.profileId === currentUserProfileId && filteredUsers.some(y => y.id === x.member1.profileId))
+                        )
+                    )
+        );
+        const mappedResults: FilteredChatDescriptor[] = filteredChats.map(x => ({ ...x, exists: true }));
+        return mappedResults.concat(
             filteredUsers
                 .filter(
                     p =>
-                        !allChats.some(c => {
+                        !filteredChats.some(c => {
                             return c.isDM && (c.member1.profileId === p.id || c.member2.profileId === p.id);
                         })
+                    && p.name.toLowerCase().includes(search)
                 )
                 .map(p => ({
                     exists: false,
@@ -266,33 +265,52 @@ function nextSidebarState(
     return nextState;
 }
 
-export async function upgradeChatDescriptor(conf: Conference, x: ChatDescriptor): Promise<SidebarChatDescriptor> {
+export async function upgradeChatDescriptor(conf: Conference, x: ChatDescriptor, currentUserProfileId?: string, activeChatIds?: string[]): Promise<SidebarChatDescriptor> {
+    const unreadCount = activeChatIds && activeChatIds.includes(x.id) ? await x.getUnreadCount() : undefined;
     if (x.isDM) {
-        const [p1, p2] = await Promise.all([
-            UserProfile.get(x.member1.profileId, conf.id),
-            UserProfile.get(x.member2.profileId, conf.id),
-        ]);
-        assert(p1);
-        assert(p2);
+        const otherProfilePromises = [];
+
+        if (!currentUserProfileId || x.member1.profileId !== currentUserProfileId) {
+            otherProfilePromises.push(UserProfile.get(x.member1.profileId, conf.id).then(
+                y => {
+                    assert(y);
+                    return {
+                        member: x.member1,
+                        profile: y
+                    };
+                }
+            ));
+        }
+
+        if (!currentUserProfileId || x.member2.profileId !== currentUserProfileId) {
+            otherProfilePromises.push(UserProfile.get(x.member2.profileId, conf.id).then(
+                y => {
+                    assert(y);
+                    return {
+                        member: x.member2,
+                        profile: y
+                    };
+                }
+            ));
+        }
+
+        const ps = await Promise.all(otherProfilePromises);
+        const otherMembers = await Promise.all(ps.map(async p => ({
+            ...p.member,
+            isOnline: await p.member.isOnline,
+            displayName: p.profile.displayName
+        })));
+
         return {
             ...x,
-            unreadCount: await x.getUnreadCount(),
+            unreadCount,
             exists: true,
-            member1: {
-                ...x.member1,
-                isOnline: await x.member1.isOnline,
-                displayName: p1.displayName,
-            },
-            member2: {
-                ...x.member2,
-                isOnline: await x.member2.isOnline,
-                displayName: p2.displayName,
-            },
+            otherMembers
         };
     } else {
         return {
             ...x,
-            unreadCount: await x.getUnreadCount(),
+            unreadCount,
             exists: true,
         };
     }
@@ -303,17 +321,9 @@ export function computeChatDisplayName(chat: SidebarChatDescriptor, mUser: UserP
     let icon: JSX.Element;
 
     if (chat.isDM) {
-        const member1 = chat.member1;
-        const member2 = chat.member2;
-        let otherOnline: boolean | undefined;
-
-        if (member1.profileId !== mUser.id) {
-            friendlyName = member1.displayName;
-            otherOnline = member1.isOnline;
-        } else {
-            friendlyName = member2.displayName;
-            otherOnline = member2.isOnline;
-        }
+        const member = chat.otherMembers[0];
+        const otherOnline = member.isOnline;
+        friendlyName = member.displayName;
 
         icon = <i className={`fa${otherOnline ? "s" : "r"} fa-circle ${otherOnline ? "online" : ""}`}></i>;
     } else {
@@ -351,10 +361,10 @@ export default function ChatsGroup(props: Props) {
 
     useSafeAsync(
         async () => {
-            if (mChat) {
+            if (mUser && mChat) {
                 const chats = await mChat.listWatchedChatsUnfiltered();
                 const chatsWithName: Array<SidebarChatDescriptor> = await Promise.all(
-                    chats.map(x => upgradeChatDescriptor(conf, x))
+                    chats.map(x => upgradeChatDescriptor(conf, x, mUser.id))
                 );
                 return chatsWithName;
             }
@@ -369,7 +379,7 @@ export default function ChatsGroup(props: Props) {
             }
             // state.watchedChatIds is required so that active chats updates
         },
-        [conf, conf.id, mChat, state.watchedChatIds],
+        [mUser?.id, conf, conf.id, mChat, state.watchedChatIds],
         "ChatsGroup:setActiveChats"
     );
 
@@ -406,7 +416,7 @@ export default function ChatsGroup(props: Props) {
 
     // Initial fetch of all chats
     useEffect(() => {
-        let cancel: () => void = () => {};
+        let cancel: () => void = () => { };
 
         async function updateChats() {
             try {
@@ -433,37 +443,41 @@ export default function ChatsGroup(props: Props) {
 
     // Update filtered chat results
     useEffect(() => {
-        let cancel: () => void = () => {};
+        let cancel: () => void = () => { };
 
-        async function updateFiltered() {
-            try {
-                const promise = makeCancelable(
-                    filterChats(
-                        state.allChats ?? [],
-                        state.allUsers ?? [],
-                        mUser?.id,
-                        state.chatSearch,
-                        props.minSearchLength
-                    )
-                );
-                cancel = promise.cancel;
-                const filteredChats = await promise.promise;
-                const filteredChatsWithNames: Array<FilteredSidebarChatDescriptor> = await Promise.all(
-                    filteredChats.map(async x => (x.exists ? await upgradeChatDescriptor(conf, x) : x))
-                );
+        if (mUser) {
+            const _mUser = mUser;
 
-                dispatchUpdate({
-                    action: "updateFilteredChats",
-                    chats: filteredChatsWithNames,
-                });
-            } catch (e) {
-                if (!e.isCanceled) {
-                    throw e;
+            async function updateFiltered() {
+                try {
+                    const promise = makeCancelable(
+                        filterChats(
+                            state.allChats ?? [],
+                            state.allUsers ?? [],
+                            _mUser.id,
+                            state.chatSearch,
+                            props.minSearchLength
+                        )
+                    );
+                    cancel = promise.cancel;
+                    const filteredChats = await promise.promise;
+                    const filteredChatsWithNames: Array<FilteredSidebarChatDescriptor> = await Promise.all(
+                        filteredChats.map(async x => (x.exists ? await upgradeChatDescriptor(conf, x, _mUser.id) : x))
+                    );
+
+                    dispatchUpdate({
+                        action: "updateFilteredChats",
+                        chats: filteredChatsWithNames,
+                    });
+                } catch (e) {
+                    if (!e.isCanceled) {
+                        throw e;
+                    }
                 }
             }
-        }
 
-        updateFiltered();
+            updateFiltered();
+        }
 
         return cancel;
     }, [conf, conf.id, props.minSearchLength, state.allChats, state.chatSearch, state.allUsers, mUser]);
@@ -492,20 +506,15 @@ export default function ChatsGroup(props: Props) {
                                     const isOnline = await u.user.isOnline;
                                     function updateDescriptor(x: SidebarChatDescriptor): SidebarChatDescriptor {
                                         if (x.isDM) {
-                                            const m1 = { ...x.member1 };
-                                            if (m1.profileId === u.user.profileId) {
-                                                m1.isOnline = isOnline;
-                                            }
-
-                                            const m2 = { ...x.member2 };
-                                            if (m2 && m2.profileId === u.user.profileId) {
-                                                m2.isOnline = isOnline;
-                                            }
-
+                                            const otherMembers = x.otherMembers.map(member => {
+                                                const newMember = { ...member };
+                                                if (newMember.profileId === u.user.profileId) {
+                                                    newMember.isOnline = isOnline;
+                                                }
+                                                return newMember;
+                                            });
                                             return {
-                                                ...x,
-                                                member1: m1,
-                                                member2: m2,
+                                                ...x, otherMembers
                                             };
                                         } else {
                                             return x;
@@ -551,7 +560,7 @@ export default function ChatsGroup(props: Props) {
     }, [conf, logger, mChat]);
 
     useEffect(() => {
-        let f: () => void = () => {};
+        let f: () => void = () => { };
         if (mChat) {
             f = mChat.chatUnreadCountChangedEvent.sub(ev => {
                 dispatchUpdate({
@@ -585,7 +594,7 @@ export default function ChatsGroup(props: Props) {
 
     const onTextChatUpdated = useCallback(
         async function _onTextChatUpdated(update: DataUpdatedEventDetails<"TextChat">) {
-            if (mChat) {
+            if (mUser && mChat) {
                 let newAllChats: Array<any> | null = null;
                 let newActiveChats: Array<any> | null = null;
 
@@ -593,7 +602,7 @@ export default function ChatsGroup(props: Props) {
                     const chat = await mChat.getChat(object.id);
                     if (chat) {
                         if (state.watchedChatIds?.includes(chat.id)) {
-                            const chatD = await upgradeChatDescriptor(conf, chat);
+                            const chatD = await upgradeChatDescriptor(conf, chat, mUser.id);
                             if (!newActiveChats) {
                                 newActiveChats = [];
                             }
@@ -625,7 +634,7 @@ export default function ChatsGroup(props: Props) {
                 }
             }
         },
-        [conf, mChat, state.watchedChatIds]
+        [conf, mChat, mUser, state.watchedChatIds]
     );
 
     const onTextChatDeleted = useCallback(async function _onTextChatDeleted(
@@ -642,7 +651,7 @@ export default function ChatsGroup(props: Props) {
             },
         ]);
     },
-    []);
+        []);
 
     useDataSubscription("TextChat", onTextChatUpdated, onTextChatDeleted, !state.watchedChatIds, conf);
 
@@ -671,7 +680,7 @@ export default function ChatsGroup(props: Props) {
             },
         });
     },
-    []);
+        []);
 
     const onUserProfileDeleted = useCallback(async function _onUserProfileDeleted(
         update: DataDeletedEventDetails<"UserProfile">
@@ -681,7 +690,7 @@ export default function ChatsGroup(props: Props) {
             update: old => old?.filter(x => x.id !== update.objectId) ?? null,
         });
     },
-    []);
+        []);
 
     useDataSubscription("UserProfile", onUserProfileUpdated, onUserProfileDeleted, !state.allUsers, conf);
 
@@ -728,11 +737,11 @@ export default function ChatsGroup(props: Props) {
                     const { friendlyName, icon, unreadCount, isDM } = chat.exists
                         ? computeChatDisplayName(chat, mUser)
                         : {
-                              isDM: true,
-                              friendlyName: chat.friendlyName,
-                              icon: <i className="fas fa-plus" />,
-                              unreadCount: undefined,
-                          };
+                            isDM: true,
+                            friendlyName: chat.friendlyName,
+                            icon: <i className="fas fa-plus" />,
+                            unreadCount: undefined,
+                        };
                     return {
                         friendlyName,
                         icon,
@@ -771,7 +780,7 @@ export default function ChatsGroup(props: Props) {
         } else {
             chatEl = (
                 <>
-                    {state.allChats ? <></> : <LoadingSpinner />}
+                    {state.allChats && state.activeChats ? <></> : <LoadingSpinner />}
                     <MenuGroup
                         items={[
                             {

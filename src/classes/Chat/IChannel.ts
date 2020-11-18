@@ -27,16 +27,16 @@ export default interface IChannel {
         member1: MemberDescriptor<Promise<boolean | undefined>>;
         member2: MemberDescriptor<Promise<boolean | undefined>>;
     }>;
-    getIsPrivate(): Promise<boolean>;
-    getIsModeration(): Promise<boolean>;
-    getIsModerationCompleted(): Promise<boolean>;
-    getIsModerationHub(): Promise<boolean>;
-    getRelatedModerationKey(): Promise<string | undefined>;
+    getIsPrivate(): boolean;
+    getIsModeration(): boolean;
+    getIsModerationCompleted(): boolean;
+    getIsModerationHub(): boolean;
+    getRelatedModerationKey(): string | undefined;
     getCreator(): Promise<UserProfile>;
-    getCreatedAt(): Promise<Date>;
+    getCreatedAt(): Date;
     delete(): Promise<void>;
 
-    getIsAutoWatchEnabled(): Promise<boolean>;
+    getIsAutoWatchEnabled(): boolean;
     setIsAutoWatchEnabled(value: boolean): Promise<void>;
 
     getMessage(messageSid: string, messageIndex: number): Promise<IMessage | null>;

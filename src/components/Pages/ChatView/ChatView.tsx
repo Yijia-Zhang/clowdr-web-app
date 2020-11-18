@@ -130,15 +130,15 @@ export default function ChatView(props: Props) {
                             name: friendlyName,
                             dmInfo: {
                                 isDM: true,
-                                member1: chatSD.member1,
-                                member2: chatSD.member2,
+                                member1: chatSD.otherMembers[0],
+                                member2: chatSD.otherMembers[1],
                             },
                             isAutoWatch: chatD.autoWatchEnabled,
                             isAnnouncements: chatD.isAnnouncements,
                             isModeration: chatD.isModeration,
                             isModerationHub: chatD.isModerationHub,
                             isPrivate: chatD.isPrivate,
-                            creator: chatD.creator,
+                            creator: await chatD.getCreator(),
                         };
                     } else {
                         return {
@@ -149,7 +149,7 @@ export default function ChatView(props: Props) {
                             isModeration: chatD.isModeration,
                             isModerationHub: chatD.isModerationHub,
                             isPrivate: chatD.isPrivate,
-                            creator: chatD.creator,
+                            creator: await chatD.getCreator(),
                         };
                     }
                 } else {

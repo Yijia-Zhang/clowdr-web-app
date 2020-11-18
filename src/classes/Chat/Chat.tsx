@@ -20,10 +20,10 @@ export type ChatDescriptor = {
     friendlyName: string;
     autoWatchEnabled: boolean;
     isAnnouncements: boolean;
-    creator: UserProfile;
     createdAt: Date;
     getLastReadIndex: () => Promise<number | null>;
     getUnreadCount: () => Promise<number>;
+    getCreator: () => Promise<UserProfile>;
 } & (
     | {
           isPrivate: boolean;
@@ -45,6 +45,7 @@ export type ChatDescriptor = {
           isDM: false;
           isModeration: true;
           isModerationHub: false;
+          creator: UserProfile;
 
           isActive: boolean;
           relatedModerationKey?: string;
@@ -76,6 +77,8 @@ export default class Chat implements IChatManager {
     private mirrorService: ParseMirrorChatService | null = null;
 
     private logger: DebugLogger = new DebugLogger("Chat");
+
+    private setupMessageNotificationsP: Promise<void> | null = null;
 
     public chatUnreadCountChangedEvent: SimpleEventDispatcher<{
         chatId: string;
@@ -119,7 +122,7 @@ export default class Chat implements IChatManager {
                 //     this.logger.warn("Error initialising Parse Chat Mirror service", e);
                 // }
 
-                await this.setupMessageNotifications();
+                this.setupMessageNotifications();
 
                 resolve(true);
             });
@@ -129,48 +132,51 @@ export default class Chat implements IChatManager {
     }
 
     private messageNotificationFunctionsToOff: Map<string, ChatEvents[]> = new Map();
-    async setupMessageNotifications() {
-        const activeChats = await this.listWatchedChatsUnfiltered();
+    setupMessageNotifications(): Promise<void> {
+        if (this.setupMessageNotificationsP) {
+            return this.setupMessageNotificationsP;
+        }
 
-        const listenToChat = async (c: ChatDescriptor) => {
-            const member = await (await this.twilioService?.getChannel(c.id))?.getMember({
-                profileId: this.profile.id,
-            });
-            let memUpdatedF;
-            if (member && typeof member !== "string") {
-                memUpdatedF = async (arg: MemberUpdatedEventArgs) => {
-                    if (
-                        arg.updateReasons.includes("lastConsumedMessageIndex") ||
-                        arg.updateReasons.includes("lastConsumptionTimestamp")
-                    ) {
-                        setTimeout(async () => {
-                            const unreadCount = await c.getUnreadCount();
-                            this.chatUnreadCountChangedEvent.dispatch({
-                                chatId: c.id,
-                                unreadCount,
-                            });
-                        }, 1000);
+        this.setupMessageNotificationsP = new Promise(async (resolve, reject) => {
+            try {
+                const activeChats = await this.listWatchedChatsUnfiltered();
+
+                const listenToChat = async (c: ChatDescriptor) => {
+                    const member = await (await this.twilioService?.getChannel(c.id))?.getMember({
+                        profileId: this.profile.id,
+                    });
+                    let memUpdatedF;
+                    if (member && typeof member !== "string") {
+                        memUpdatedF = async (arg: MemberUpdatedEventArgs) => {
+                            if (
+                                arg.updateReasons.includes("lastConsumedMessageIndex") ||
+                                arg.updateReasons.includes("lastConsumptionTimestamp")
+                            ) {
+                                const unreadCount = await c.getUnreadCount();
+                                this.chatUnreadCountChangedEvent.dispatch({
+                                    chatId: c.id,
+                                    unreadCount,
+                                });
+                            }
+                        };
+                        member.onUpdated(memUpdatedF);
                     }
-                };
-                member.onUpdated(memUpdatedF);
-            }
 
-            const msgAddedF = await this.channelEventOn(c.id, "messageAdded", {
-                componentName: "ChatsGroup",
-                caller: "addNotification",
-                function: async msg => {
-                    if (
-                        msg.author !== this.profile.id &&
-                        !window.location.pathname.includes(`/chat/${c.id}`) &&
-                        !window.location.pathname.includes(`/moderation/${c.id}`) &&
-                        (!c.isModerationHub || !window.location.pathname.includes("/moderation/hub"))
-                    ) {
-                        const isAnnouncement = c.friendlyName === "Announcements";
-                        const title = isAnnouncement
-                            ? ""
-                            : `**${
-                                  c.isDM
-                                      ? (
+                    const msgAddedF = await this.channelEventOn(c.id, "messageAdded", {
+                        componentName: "ChatsGroup",
+                        caller: "addNotification",
+                        function: async msg => {
+                            if (
+                                msg.author !== this.profile.id &&
+                                !window.location.pathname.includes(`/chat/${c.id}`) &&
+                                !window.location.pathname.includes(`/moderation/${c.id}`) &&
+                                (!c.isModerationHub || !window.location.pathname.includes("/moderation/hub"))
+                            ) {
+                                const isAnnouncement = c.friendlyName === "Announcements";
+                                const title = isAnnouncement
+                                    ? ""
+                                    : `**${c.isDM
+                                        ? (
                                             await UserProfile.get(
                                                 c.member1.profileId === this.profile.id
                                                     ? c.member2.profileId
@@ -178,79 +184,90 @@ export default class Chat implements IChatManager {
                                                 this.conference.id
                                             )
                                         )?.displayName
-                                      : c.friendlyName
-                              }**\n\n`;
-                        const body = `${title}${msg.body}`;
-                        addNotification(
-                            <ReactMarkdownCustomised>{body}</ReactMarkdownCustomised>,
-                            isAnnouncement
-                                ? undefined
-                                : c.isModerationHub
-                                ? msg.attributes?.moderationChat
-                                    ? {
-                                          url: `/moderation/${msg.attributes.moderationChat}`,
-                                          text: "Go to moderation channel",
-                                      }
-                                    : {
-                                          url: `/moderation/hub`,
-                                          text: "Go to moderation hub",
-                                      }
-                                : c.isModeration
-                                ? {
-                                      url: `/moderation/${c.id}`,
-                                      text: "Go to moderation channel",
-                                  }
-                                : {
-                                      url: `/chat/${c.id}`,
-                                      text: "Go to chat",
-                                  },
-                            10000
-                        );
+                                        : c.friendlyName
+                                    }**\n\n`;
+                                const body = `${title}${msg.body}`;
+                                addNotification(
+                                    <ReactMarkdownCustomised>{body}</ReactMarkdownCustomised>,
+                                    isAnnouncement
+                                        ? undefined
+                                        : c.isModerationHub
+                                            ? msg.attributes?.moderationChat
+                                                ? {
+                                                    url: `/moderation/${msg.attributes.moderationChat}`,
+                                                    text: "Go to moderation channel",
+                                                }
+                                                : {
+                                                    url: `/moderation/hub`,
+                                                    text: "Go to moderation hub",
+                                                }
+                                            : c.isModeration
+                                                ? {
+                                                    url: `/moderation/${c.id}`,
+                                                    text: "Go to moderation channel",
+                                                }
+                                                : {
+                                                    url: `/chat/${c.id}`,
+                                                    text: "Go to chat",
+                                                },
+                                    10000
+                                );
 
-                        const unreadCount = await c.getUnreadCount();
-                        this.chatUnreadCountChangedEvent.dispatch({
-                            chatId: c.id,
-                            unreadCount,
+                                const unreadCount = await c.getUnreadCount();
+                                this.chatUnreadCountChangedEvent.dispatch({
+                                    chatId: c.id,
+                                    unreadCount,
+                                });
+                            }
+                        },
+                    });
+
+                    const results: ChatEvents[] = [{ event: "messageAdded", f: msgAddedF }];
+                    if (memUpdatedF) {
+                        results.push({
+                            event: "memberUpdated",
+                            f: memUpdatedF,
                         });
                     }
-                },
-            });
+                    return results;
+                };
 
-            const results: ChatEvents[] = [{ event: "messageAdded", f: msgAddedF }];
-            if (memUpdatedF) {
-                results.push({
-                    event: "memberUpdated",
-                    f: memUpdatedF,
-                });
-            }
-            return results;
-        };
+                const p = await Promise.all(activeChats.map(async c => [c.id, await listenToChat(c)]));
+                this.messageNotificationFunctionsToOff = new Map(p as any);
 
-        const p = await Promise.all(activeChats.map(async c => [c.id, await listenToChat(c)]));
-        this.messageNotificationFunctionsToOff = new Map(p as any);
-
-        // TODO: Deal with the unsubscribe
-        (await WatchedItems.onDataUpdated(this.conference.id)).subscribe(async ev => {
-            const objs = ev.objects as WatchedItems[];
-            for (const obj of objs) {
-                const watchedChats = obj.watchedChats;
-                const newlyActive = watchedChats.filter(x => !this.messageNotificationFunctionsToOff.has(x));
-                const previouslyActive = Array.from(this.messageNotificationFunctionsToOff.keys()).filter(
-                    x => !watchedChats.includes(x)
-                );
-                if (this.twilioService) {
-                    for (const chatId of newlyActive) {
-                        const c = await this.getChat(chatId);
-                        if (c) {
-                            this.messageNotificationFunctionsToOff.set(chatId, await listenToChat(c));
+                (await WatchedItems.onDataUpdated(this.conference.id)).subscribe(async ev => {
+                    const objs = ev.objects as WatchedItems[];
+                    for (const obj of objs) {
+                        const watchedChats = obj.watchedChats;
+                        const newlyActive = watchedChats.filter(x => !this.messageNotificationFunctionsToOff.has(x));
+                        const previouslyActive = Array.from(this.messageNotificationFunctionsToOff.keys()).filter(
+                            x => !watchedChats.includes(x)
+                        );
+                        if (this.twilioService) {
+                            for (const chatId of newlyActive) {
+                                const c = await this.getChat(chatId);
+                                if (c) {
+                                    this.messageNotificationFunctionsToOff.set(chatId, await listenToChat(c));
+                                }
+                            }
+                            for (const chatId of previouslyActive) {
+                                this.teardownMessageNotificationsForChat(chatId);
+                            }
                         }
                     }
-                    for (const chatId of previouslyActive) {
-                        this.teardownMessageNotificationsForChat(chatId);
-                    }
-                }
+                });
+
+                resolve();
+            }
+            catch (e) {
+                reject(e);
+            }
+            finally {
+                this.setupMessageNotificationsP = null;
             }
         });
+
+        return this.setupMessageNotificationsP;
     }
 
     async teardownMessageNotificationsForChat(chatId: string) {
@@ -272,6 +289,10 @@ export default class Chat implements IChatManager {
     }
 
     async teardownMessageNotifications() {
+        if (this.setupMessageNotificationsP) {
+            await this.setupMessageNotificationsP;
+        }
+
         await Promise.all(
             Array.from(this.messageNotificationFunctionsToOff.keys()).map(async key =>
                 this.teardownMessageNotificationsForChat(key)
@@ -325,29 +346,36 @@ export default class Chat implements IChatManager {
         return this.teardownPromise ?? Promise.resolve();
     }
 
-    public async convertToDescriptor(chan: IChannel): Promise<ChatDescriptor | null> {
-        try {
+    private _announcementsChannelSID: string | null = null;
+    public async getAnnouncementsChannelSID(): Promise<string | null> {
+        if (!this._announcementsChannelSID) {
             const configs = await ConferenceConfiguration.getByKey(
                 "TWILIO_ANNOUNCEMENTS_CHANNEL_SID",
                 this.conference.id
             );
-            let isAnnouncements = false;
             if (configs.length > 0) {
-                isAnnouncements = configs[0].value === chan.sid;
+                this._announcementsChannelSID = configs[0].value;
             }
-            const isModHub = await chan.getIsModerationHub();
-            const isMod = await chan.getIsModeration();
-            const creator = await chan.getCreator();
-            const createdAt = await chan.getCreatedAt();
+        }
+        return this._announcementsChannelSID;
+    }
+
+    public async convertToDescriptor(chan: IChannel): Promise<ChatDescriptor | null> {
+        try {
+            const announcementsChannelSID = await this.getAnnouncementsChannelSID();
+            const isAnnouncements = announcementsChannelSID === chan.sid;
+            const isModHub = chan.getIsModerationHub();
+            const isMod = chan.getIsModeration();
+            const createdAt = chan.getCreatedAt();
             if (isModHub) {
                 return {
                     id: chan.id,
                     friendlyName: chan.getName(),
-                    creator,
                     createdAt,
                     getLastReadIndex: () => chan.getLastReadIndex(),
                     getUnreadCount: () => chan.getUnreadMessageCount(),
-                    autoWatchEnabled: await chan.getIsAutoWatchEnabled(),
+                    getCreator: () => chan.getCreator(),
+                    autoWatchEnabled: chan.getIsAutoWatchEnabled(),
                     isAnnouncements,
                     isModeration: false,
                     isModerationHub: true,
@@ -355,6 +383,7 @@ export default class Chat implements IChatManager {
                     isPrivate: true,
                 };
             } else if (isMod) {
+                const creator = await chan.getCreator();
                 return {
                     id: chan.id,
                     friendlyName: chan.getName(),
@@ -362,27 +391,28 @@ export default class Chat implements IChatManager {
                     createdAt,
                     getLastReadIndex: () => chan.getLastReadIndex(),
                     getUnreadCount: () => chan.getUnreadMessageCount(),
-                    autoWatchEnabled: await chan.getIsAutoWatchEnabled(),
+                    getCreator: () => Promise.resolve(creator),
+                    autoWatchEnabled: chan.getIsAutoWatchEnabled(),
                     isAnnouncements,
                     isModeration: isMod,
                     isModerationHub: false,
-                    isActive: !(await chan.getIsModerationCompleted()),
-                    relatedModerationKey: await chan.getRelatedModerationKey(),
+                    isActive: !chan.getIsModerationCompleted(),
+                    relatedModerationKey: chan.getRelatedModerationKey(),
                     isDM: false,
                     isPrivate: true,
                 };
             } else {
                 const isDM = await chan.getIsDM();
-                const isPrivate = await chan.getIsPrivate();
+                const isPrivate = chan.getIsPrivate();
                 if (isDM) {
                     return {
                         id: chan.id,
                         friendlyName: chan.getName(),
-                        creator,
                         createdAt,
                         getLastReadIndex: () => chan.getLastReadIndex(),
                         getUnreadCount: () => chan.getUnreadMessageCount(),
-                        autoWatchEnabled: await chan.getIsAutoWatchEnabled(),
+                        getCreator: () => chan.getCreator(),
+                        autoWatchEnabled: chan.getIsAutoWatchEnabled(),
                         isAnnouncements,
                         isPrivate: true,
                         isModeration: false,
@@ -395,11 +425,11 @@ export default class Chat implements IChatManager {
                     return {
                         id: chan.id,
                         friendlyName: chan.getName(),
-                        creator,
                         createdAt,
                         getLastReadIndex: () => chan.getLastReadIndex(),
                         getUnreadCount: () => chan.getUnreadMessageCount(),
-                        autoWatchEnabled: await chan.getIsAutoWatchEnabled(),
+                        getCreator: () => chan.getCreator(),
+                        autoWatchEnabled: chan.getIsAutoWatchEnabled(),
                         isAnnouncements,
                         isModeration: false,
                         isModerationHub: false,
@@ -456,10 +486,10 @@ export default class Chat implements IChatManager {
     public async listAllChats(): Promise<Array<ChatDescriptor>> {
         try {
             assert(this.twilioService);
-            const channels = await this.twilioService.allChannels();
-            return removeNull(await Promise.all(channels?.map(x => this.convertToDescriptor(x)) ?? [])).filter(
-                x => !x.isModeration && !x.isModerationHub
+            const channels = await this.twilioService.channels(x =>
+                x.mode === "ordinary" && (!x.isDM || x.name.includes(this.profile.id))
             );
+            return removeNull(await Promise.all(channels.map(x => this.convertToDescriptor(x)) ?? []));
         } catch {
             return [];
         }
@@ -468,10 +498,8 @@ export default class Chat implements IChatManager {
     public async listAllModerationChats(): Promise<Array<ChatDescriptor>> {
         try {
             assert(this.twilioService);
-            const channels = await this.twilioService.allChannels();
-            return removeNull(await Promise.all(channels?.map(x => this.convertToDescriptor(x)) ?? [])).filter(
-                x => x.isModeration
-            );
+            const channels = await this.twilioService.channels(x => x.mode === "moderation" || x.mode === "moderation_completed");
+            return removeNull(await Promise.all(channels?.map(x => this.convertToDescriptor(x)) ?? []));
         } catch {
             return [];
         }

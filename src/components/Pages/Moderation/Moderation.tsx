@@ -1,5 +1,6 @@
 import { ConferenceConfiguration, UserProfile, _Role } from "@clowdr-app/clowdr-db-schema";
 import { removeNull } from "@clowdr-app/clowdr-db-schema/build/Util";
+import assert from "assert";
 import React, { useEffect, useState } from "react";
 import MultiSelect from "react-multi-select-component";
 import { Link, Redirect } from "react-router-dom";
@@ -83,7 +84,10 @@ export default function Moderation() {
     // Fetch all moderation channels
     useSafeAsync(
         async () =>
-            mChat ? (await mChat.listAllModerationChats()).filter(x => x.creator.id === currentUserProfile.id) : null,
+            mChat ? (await mChat.listAllModerationChats()).filter(x => {
+                assert(x.isModeration);
+                return x.creator.id === currentUserProfile.id
+            }) : null,
         setModChannels,
         [mChat],
         "Moderation:setModChannels"
