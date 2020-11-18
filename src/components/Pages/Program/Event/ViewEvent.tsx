@@ -324,6 +324,7 @@ export default function ViewEvent(props: Props) {
 
                 const distToStart = now - eventStart;
                 const distToEnd = now - eventEnd;
+                const eventDuration = eventEnd - eventStart;
 
                 const second = 1000;
                 const minute = 60 * second;
@@ -343,7 +344,7 @@ export default function ViewEvent(props: Props) {
                 else if (distToEnd < (minute * 0)) {
                     return EventViewMode.WatchAndQuestion;
                 }
-                else if (distToEnd < (minute * 15)) {
+                else if (distToEnd < eventDuration - (minute * 5)) {
                     return EventViewMode.QuestionOnly;
                 }
                 else {
