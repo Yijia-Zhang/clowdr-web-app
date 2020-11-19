@@ -29,10 +29,8 @@ export default function NewChatRoom() {
      */
 
     async function doCreateRoom() {
-
-        const _newRoomId = await mVideo?.createVideoRoom(
-            2, true, false, "Chat Roulette Room"
-        );
+        const _newRoomId = await mVideo?.createRouletteRoom(
+            2, true, false, "Chat Roulette Room", "roulette");
         console.log(`New room id: ${_newRoomId}`);
         setNewRoomId(_newRoomId ?? null);
     }
