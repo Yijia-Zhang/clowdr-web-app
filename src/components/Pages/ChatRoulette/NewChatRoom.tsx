@@ -18,7 +18,7 @@ export default function NewChatRoom() {
     const [isPrivate, setIsPrivate] = useState<boolean>(false);
     const { isAdmin, isManager } = useUserRoles();
 
-    useHeading("New room");
+    useHeading("Ready to start a new roulette?");
 
     /**
      * Elements that need to be on this page (as a MVP):
@@ -28,10 +28,22 @@ export default function NewChatRoom() {
      *    * Ephemeral selector (forced to true if not an admin/manager)
      */
 
-    async function doCreateRoom() {
-        const _newRoomId = await mVideo?.createRouletteRoom(
-            2, true, false, "Chat Roulette Room", "roulette");
-        console.log(`New room id: ${_newRoomId}`);
+    // TODO: to be implemented by bingfei
+    async function getRouletteRoom(){
+        return null;
+    }
+
+    async function joinRoulette() {
+        let _newRoomId: string | undefined;
+        const reply = await getRouletteRoom();
+        if (reply == null){
+            _newRoomId = await mVideo?.createRouletteRoom(
+                2, true, false, "Chat Roulette", "roulette");
+            console.log(`New room id: ${_newRoomId}`);
+        } else {
+            _newRoomId = reply
+            console.log(`Existing room id: ${_newRoomId}`);
+        }
         setNewRoomId(_newRoomId ?? null);
     }
 
@@ -41,12 +53,12 @@ export default function NewChatRoom() {
     // const persistentEl : boolean = false;
     // const titleEl : string = "Private room";
     const createButton =
-        <AsyncButton action={() => doCreateRoom()} children="Ready" />;
+        <AsyncButton action={() => joinRoulette()} children="Ready!" />;
 
     return newRoomId
         ? <Redirect to={`/roulette/${newRoomId}`} />
         : <div className="new-video-room">
-            <form onSubmit={() => doCreateRoom()}>
+            <form onSubmit={() => joinRoulette()}>
                 {/*{capacityEl}<br />*/}
                 {/*{titleEl}<br />*/}
                 {/*{privateEl}<br />*/}
