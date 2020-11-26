@@ -264,7 +264,9 @@ function Page(props: Props) {
                     <Route path="/roulette/:roomId" component={(p: RouteComponentProps<any>) =>
                         <VideoRoom roomId={p.match.params.roomId} />
                     } />
-                    <Route path="/roulette" component={NewChatRoom} />
+                    <Route path="/roulette" component={() => (
+                            <NewChatRoom userProfileId={mUser.id} />
+                    )} />
 
                     {footerRoutes}
 

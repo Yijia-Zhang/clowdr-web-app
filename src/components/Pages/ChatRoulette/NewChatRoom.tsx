@@ -7,8 +7,15 @@ import AsyncButton from "../../AsyncButton/AsyncButton";
 import { addError } from "../../../classes/Notifications/Notifications";
 import "./NewChatRoom.scss";
 import useUserRoles from "../../../hooks/useUserRoles";
+import Parse from "parse"
+import { UserProfile } from "@clowdr-app/clowdr-db-schema";
 
-export default function NewChatRoom() {
+
+interface Props {
+    userProfileId: string;
+}
+
+export default function NewChatRoom(props: Props) {
     const mVideo = useMaybeVideo();
     const [newRoomId, setNewRoomId] = useState<string | null>(null);
 
@@ -29,13 +36,17 @@ export default function NewChatRoom() {
      */
 
     // TODO: to be implemented by bingfei
-    async function getRouletteRoom(){
-        return null;
-    }
+    // async function getRouletteRoom(){
+    //     let id = await Parse.Cloud.run("getRouletteRoom");
+    //     console.log(id);
+    //     return null;
+    // }
 
     async function joinRoulette() {
         let _newRoomId: string | undefined;
-        const reply = await getRouletteRoom();
+        const reply = await Parse.Cloud.run("getRouletteRoom",{
+            userId: props.userProfileId,
+        });
         if (reply == null){
             _newRoomId = await mVideo?.createRouletteRoom(
                 2, true, false, "Chat Roulette", "roulette");
