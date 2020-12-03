@@ -9,7 +9,6 @@ const { createTextChat } = require("./textChat");
 const Twilio = require("twilio");
 const { logRequestError } = require("./errors");
 
-
 async function getRouletteRoom(data) {
     let userId = data.params.userId;
     let id;
@@ -31,10 +30,10 @@ async function getRouletteRoom(data) {
                 let newObject = new Parse.Object("RouletteHistory", {
                     conference: roomResults[i].get("conference"),
                     participants: [roomResults[i].get("participants")[0],userId],
-                    connected: false
+                    rouletteRoomId: id,
+                    connected: null,
                 });
                 await newObject.save(null, { useMasterKey: true });
-                break;
             }
         }
     }
@@ -42,3 +41,19 @@ async function getRouletteRoom(data) {
 }
 
 Parse.Cloud.define("getRouletteRoom", getRouletteRoom);
+
+async function updateRouletteConnectionHistory(data){
+    let historyQuery = new Parse.Query("RouletteHistory");
+    historyQuery.equalTo("rouletteRoomId", data.params.roomId);
+    const historyResults = await historyQuery.first({ useMasterKey: true });
+    let curState = historyResults.get("connected");
+    let participants = historyResults.get("participants");
+    let newState = curState==null?false:true;
+    historyResults.set("connected", newState);
+    await historyResults.save(null, { useMasterKey: true });
+}
+Parse.Cloud.define("updateRouletteConnectionHistory", updateRouletteConnectionHistory);
+
+module.exports = {
+    updateRouletteConnectionHistory
+};

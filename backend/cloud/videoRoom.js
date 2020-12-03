@@ -8,6 +8,7 @@ const { getConfig } = require("./config");
 const { createTextChat } = require("./textChat");
 const Twilio = require("twilio");
 const { logRequestError } = require("./errors");
+const {updateRouletteConnectionHistory} = require("./chatRoulette");
 
 // Video rooms are created in Twilio only when they are first needed.
 // So they are created when a user requests an access token for a room -
