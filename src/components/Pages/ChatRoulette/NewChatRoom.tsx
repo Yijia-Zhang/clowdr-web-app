@@ -49,7 +49,7 @@ export default function NewChatRoom(props: Props) {
         });
         if (reply == null){
             _newRoomId = await mVideo?.createRouletteRoom(
-                2, true, false, "Chat Roulette", "roulette");
+                2, true, false, "Chat Roulette " + Date.now(), "roulette");
             console.log(`New room id: ${_newRoomId}`);
         } else {
             _newRoomId = reply

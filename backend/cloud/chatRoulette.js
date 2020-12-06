@@ -13,8 +13,7 @@ async function getRouletteRoom(data) {
     let userId = data.params.userId;
     let id;
     let roomQuery = new Parse.Query("VideoRoom");
-    roomQuery
-        .equalTo("mode", "roulette");
+    roomQuery.equalTo("mode", "roulette");
     const roomResults = await(await roomQuery.find({ useMasterKey: true })).filter(room => room.get("participants").length === 1);
     if (roomResults.length !== 0) {
         const historyQuery = new Parse.Query("RouletteHistory");
@@ -34,6 +33,7 @@ async function getRouletteRoom(data) {
                     connected: null,
                 });
                 await newObject.save(null, { useMasterKey: true });
+                break;
             }
         }
     }
@@ -47,12 +47,27 @@ async function updateRouletteConnectionHistory(data){
     historyQuery.equalTo("rouletteRoomId", data.params.roomId);
     const historyResults = await historyQuery.first({ useMasterKey: true });
     let curState = historyResults.get("connected");
-    let participants = historyResults.get("participants");
     let newState = curState==null?false:true;
     historyResults.set("connected", newState);
     await historyResults.save(null, { useMasterKey: true });
 }
 Parse.Cloud.define("updateRouletteConnectionHistory", updateRouletteConnectionHistory);
+
+async function getRouletteConnectionHistory(data){
+    let userId = data.params.userId;
+    let historyQuery = new Parse.Query("RouletteHistory");
+    const historyResults =  await (await historyQuery.find({ useMasterKey: true })).filter(history => history.get("participants").includes(userId));
+    return historyResults;
+}
+Parse.Cloud.define("getRouletteConnectionHistory", getRouletteConnectionHistory);
+
+async function getUserName(data){
+    let userIds = data.params.userIds;
+    let userProfileQuery = new Parse.Query("UserProfile");
+    const userProfileResults =  await userProfileQuery.containedIn("objectId", userIds).find({ useMasterKey: true });
+    return userProfileResults;
+}
+Parse.Cloud.define("getUserName", getUserName);
 
 module.exports = {
     updateRouletteConnectionHistory

@@ -240,9 +240,7 @@ function Page(props: Props) {
                         )}
                     />
 
-                    <Route path="/connections" component={()=>
-                        <Connections />
-                    } />
+                    <Route path="/connections" component={() => <Connections userProfileId={mUser.id}/>} />
 
                     <Route
                         path="/profile/:userProfileId"

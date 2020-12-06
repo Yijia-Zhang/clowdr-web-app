@@ -230,12 +230,7 @@ async function handleCreateRouletteRoom(req) {
 
             const spec = params;
             spec.conference = new Parse.Object("Conference", { id: confId });
-            // Prevent non-admin/manager from creating persistent rooms
-            // Prevent non-admin/manager from creating large rooms
-            if (!await isUserInRoles(user.id, confId, ["admin", "manager"])) {
-                spec.ephemeral = true;
-                spec.capacity = 10;
-            }
+
             // Clamp capacity down to Twilio max size
             spec.capacity = Math.min(spec.capacity, 50);
 
